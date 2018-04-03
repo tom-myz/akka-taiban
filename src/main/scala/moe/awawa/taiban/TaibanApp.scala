@@ -1,9 +1,14 @@
 package moe.awawa.taiban
 
-import org.slf4j.LoggerFactory
+import akka.actor.{ActorSystem, Props}
+import moe.awawa.taiban.actor.Live
+import moe.awawa.taiban.model.UserModels.Initialize
+
+import scala.concurrent.ExecutionContext
 
 object TaibanApp extends App {
-  val logger = LoggerFactory.getLogger(this.getClass)
-  println("Hello!")
-  logger.info("World!")
+  implicit val ec: ExecutionContext = scala.concurrent.ExecutionContext.global
+
+  val system = ActorSystem.create("actorSystem")
+  system.actorOf(Props(new Live)) ! Initialize
 }
