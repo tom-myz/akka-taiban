@@ -10,8 +10,8 @@
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>time:%d{ISO8601}\tlevel:%level\tcategory:%logger{15}\tmessage:%msg\n</pattern>
-        </encoder>
+            <pattern>[%level]%d{ISO8601}\t%logger{0}\t%message%n%xException{10}</pattern>
+        </encoder>ß
     </appender>
 
     <appender name="ASYNCFILE" class="ch.qos.logback.classic.AsyncAppender">
@@ -23,6 +23,7 @@
     </appender>
 
     <logger name="moe.awawa" level="DEBUG" />
+    <logger name="application" level="INFO" />
 
     <!-- Off these ones as they are annoying, and anyway we manage configuration ourselves -->
     <logger name="com.avaje.ebean.config.PropertyMapLoader" level="OFF" />
