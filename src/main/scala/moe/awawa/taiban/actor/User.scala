@@ -4,7 +4,12 @@ import akka.actor.{Actor, Cancellable}
 import moe.awawa.taiban.enrich.RichString._
 import moe.awawa.taiban.model.EventType
 import moe.awawa.taiban.model.EventType.{Logging, NodeJudge}
-import moe.awawa.taiban.model.UserModels.{Combo, Terminate, UserList, User => UserWrapper}
+import moe.awawa.taiban.model.UserModels.{
+  Combo,
+  Terminate,
+  UserList,
+  User => UserWrapper
+}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -17,15 +22,14 @@ class User(val name: String)(implicit val ec: ExecutionContext) extends Actor {
   import moe.awawa.taiban.model.UserActorStatus._
   import User._
 
-  var combo = 0
-
   val logger = LoggerFactory.getLogger(s"moe.awawa.taiban.actor.User.${name}")
-  var otherUsers: Map[UserWrapper, Int] = Map()
-  var status: Status = Created
-
   val accuracy = math.random() * accuracyNoise + (1 - accuracyNoise)
 
-  val events: mutable.Map[EventType, Cancellable] = mutable.Map()
+  private[this] var combo = 0
+  private[this] var otherUsers: Map[UserWrapper, Int] = Map()
+  private[this] var status: Status = Created
+
+  protected val events: mutable.Map[EventType, Cancellable] = mutable.Map()
 
   override def receive: Receive = {
     case list: UserList => {
@@ -35,7 +39,7 @@ class User(val name: String)(implicit val ec: ExecutionContext) extends Actor {
         .toMap
       status = Ready
       context.become(activate)
-      context.system.scheduler.scheduleOnce(5 seconds)(write)
+      context.system.scheduler.scheduleOnce(comboUpdateInterval)(write)
       context.system.scheduler.scheduleOnce(frequency)(tap)
     }
   }
@@ -53,7 +57,7 @@ class User(val name: String)(implicit val ec: ExecutionContext) extends Actor {
   }
 
   protected def write: Unit = {
-    Try(context.system.scheduler.scheduleOnce(5 seconds)(write)).map { fb =>
+    Try(context.system.scheduler.scheduleOnce(comboUpdateInterval)(write)).map { fb =>
       events += (Logging -> fb)
     }
     logger.debug(formattedCombo)
@@ -78,6 +82,7 @@ class User(val name: String)(implicit val ec: ExecutionContext) extends Actor {
 }
 
 object User {
-  val accuracyNoise = 0.2
+  val accuracyNoise = 0.05
   val frequency = 200 milliseconds
+  val comboUpdateInterval = 2 seconds
 }
