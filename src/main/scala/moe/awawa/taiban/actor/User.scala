@@ -1,8 +1,8 @@
 package moe.awawa.taiban.actor
 
-import akka.actor.{Actor, Cancellable}
+import akka.actor.{Actor, ActorSystem}
+import moe.awawa.taiban.`trait`.EventLooper
 import moe.awawa.taiban.enrich.RichString._
-import moe.awawa.taiban.model.EventType
 import moe.awawa.taiban.model.EventType.{Logging, NodeJudge}
 import moe.awawa.taiban.model.UserModels.{
   Combo,
@@ -12,15 +12,17 @@ import moe.awawa.taiban.model.UserModels.{
 }
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.util.Try
 
-class User(val name: String)(implicit val ec: ExecutionContext) extends Actor {
+class User(val name: String)(implicit val ec: ExecutionContext)
+    extends Actor
+    with EventLooper {
 
-  import moe.awawa.taiban.model.UserActorStatus._
   import User._
+  import moe.awawa.taiban.model.UserActorStatus._
+
+  override val actorSystem: ActorSystem = context.system
 
   val logger = LoggerFactory.getLogger(s"moe.awawa.taiban.actor.User.${name}")
   val accuracy = math.random() * accuracyNoise + (1 - accuracyNoise)
@@ -28,8 +30,6 @@ class User(val name: String)(implicit val ec: ExecutionContext) extends Actor {
   private[this] var combo = 0
   private[this] var otherUsers: Map[UserWrapper, Int] = Map()
   private[this] var status: Status = Created
-
-  protected val events: mutable.Map[EventType, Cancellable] = mutable.Map()
 
   override def receive: Receive = {
     case list: UserList => {
@@ -39,8 +39,9 @@ class User(val name: String)(implicit val ec: ExecutionContext) extends Actor {
         .toMap
       status = Ready
       context.become(activate)
-      context.system.scheduler.scheduleOnce(comboUpdateInterval)(write)
-      context.system.scheduler.scheduleOnce(frequency)(tap)
+
+      kickEvent(Logging, comboUpdateInterval)(write)
+      kickEvent(NodeJudge, frequency)(tap)
     }
   }
 
@@ -50,23 +51,15 @@ class User(val name: String)(implicit val ec: ExecutionContext) extends Actor {
       otherUsers += c.user -> c.comboNumber
     }
     case Terminate => {
-      events.foreach { case (_, value) => value.cancel() }
-      logger.debug(formattedCombo)
+      cancelAll
+      write()
       context.stop(self)
     }
   }
 
-  protected def write: Unit = {
-    Try(context.system.scheduler.scheduleOnce(comboUpdateInterval)(write)).map { fb =>
-      events += (Logging -> fb)
-    }
-    logger.debug(formattedCombo)
-  }
+  protected def write = () => logger.debug(formattedCombo)
 
-  protected def tap: Unit = {
-    Try(context.system.scheduler.scheduleOnce(frequency)(tap)).map { fb =>
-      events += (NodeJudge -> fb)
-    }
+  protected def tap = () => {
     combo = if (math.random() < accuracy) (combo + 1) else 0
     context.parent ! Combo(UserWrapper(name, self), combo)
   }
