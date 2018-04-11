@@ -38,7 +38,7 @@ class Live(implicit val ec: ExecutionContext) extends Actor {
       users.foreach(_.ref ! UserList(users))
     }
     case c: Combo => broadcastCombo(c)
-    case x => logger.info(x.getClass.getCanonicalName)
+    case x => logger.info(x.toString)
   }
 
   override def postStop(): Unit = {
